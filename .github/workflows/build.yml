@@ -20,12 +20,15 @@ jobs:
 
       - name: Install Boost via vcpkg
         run: |
-          & "C:\Program Files\vcpkg\vcpkg.exe" install boost:x64-windows
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
         shell: pwsh
 
       - name: Configure with CMake
-        run: cmake -B build `
-          -DCMAKE_TOOLCHAIN_FILE="C:/Program Files/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        run: |
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          cmake -B build `
+            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: pwsh
 
       - name: Build with CMake
