@@ -18,6 +18,14 @@ jobs:
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\packages
+          key: vcpkg-windows-${{ runner.os }}-boost-x64
+          restore-keys: |
+            vcpkg-windows-${{ runner.os }}-
+
       - name: Install Boost via vcpkg
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
