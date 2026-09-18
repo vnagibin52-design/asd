@@ -1,4 +1,4 @@
-name: CI1
+name: CI
 
 on:
   push:
@@ -9,43 +9,70 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup MSVC environment
+      # Для Windows: настройка MSVC. Для Linux: ничего не нужно (gcc/clang уже есть)
+      - name: Setup MSVC environment (Windows only)
+        if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
 
+      # Кэш vcpkg: пути разные на Windows и Linux
       - name: Cache vcpkg binary archives and downloads
         uses: actions/cache@v4
         with:
           path: |
-            C:\Users\runneradmin\AppData\Local\vcpkg\archives
-            C:\vcpkg\downloads
-          key: vcpkg-boost-x64-windows-${{ runner.os }}
+            ${{ matrix.os == 'windows-latest' && 'C:\Users\runneradmin\AppData\Local\vcpkg\archives' || '/home/runner/.cache/vcpkg/archives' }}
+            ${{ matrix.os == 'windows-latest' && 'C:\vcpkg\downloads' || '/home/runner/vcpkg/downloads' }}
+          key: vcpkg-boost-${{ matrix.os }}-${{ hashFiles('**/CMakeLists.txt') }}
           restore-keys: |
-            vcpkg-boost-x64-windows-
+            vcpkg-boost-${{ matrix.os }}-
 
+      # Установка vcpkg (если нет) и Boost. Триплет разный для платформ.
       - name: Install Boost via vcpkg
         run: |
-          $env:VCPKG_ROOT = "C:\vcpkg"
-          & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            $env:VCPKG_ROOT = "C:\vcpkg"
+            & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
+          else
+            export VCPKG_ROOT="$HOME/vcpkg"
+            ./vcpkg/vcpkg install boost:x64-linux
+          fi
         shell: pwsh
 
+      # Настройка CMake. Пути и флаги отличаются.
       - name: Configure with CMake
         run: |
-          $env:VCPKG_ROOT = "C:\vcpkg"
-          cmake -B build `
-            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            $env:VCPKG_ROOT = "C:\vcpkg"
+            cmake -B build `
+              -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          else
+            export VCPKG_ROOT="$HOME/vcpkg"
+            cmake -B build \
+              -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          fi
         shell: pwsh
 
+      # Сборка. На Linux не нужна конфигурация Release/Debug отдельно — cmake --build всё сделает.
       - name: Build with CMake
-        run: cmake --build build --config Release
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build build --config Release
+          else
+            cmake --build build
+          fi
         shell: pwsh
 
-      - name: Copy Boost DLLs next to executables
+      # Копирование DLL только для Windows. На Linux shared-библиотеки обычно не копируют рядом с бинарником в CI.
+      - name: Copy Boost DLLs next to executables (Windows only)
+        if: matrix.os == 'windows-latest'
         run: |
           $boostBin = "C:\vcpkg\installed\x64-windows\bin"
           $buildDir = "build\Release"
@@ -55,6 +82,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
-          path: build/Release/
+          name: ${{ matrix.os }}-build
+          path: build/
           retention-days: 7
