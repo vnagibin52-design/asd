@@ -31,15 +31,14 @@ jobs:
       - name: Configure NuGet source for vcpkg binary cache
         shell: pwsh
         run: |
-          .$($env:VCPKG_EXE fetch nuget) `
-            sources add `
+          $nuget = & "C:\vcpkg\vcpkg.exe" fetch nuget | Select-Object -Last 1
+          & $nuget sources add `
             -Source $env:FEED_URL `
             -StorePasswordInClearText `
             -Name GitHubPackages `
             -UserName $env:USERNAME `
             -Password ${{ secrets.GITHUB_TOKEN }}
-          .$($env:VCPKG_EXE fetch nuget) `
-            setapikey ${{ secrets.GITHUB_TOKEN }} `
+          & $nuget setapikey ${{ secrets.GITHUB_TOKEN }} `
             -Source $env:FEED_URL
 
       - name: Install Boost via vcpkg
