@@ -18,21 +18,17 @@ jobs:
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Cache vcpkg installed packages
-        uses: actions/cache@v4
+       # Экспортируем переменные для бинарного кэша vcpkg
+      - name: Export GitHub Actions cache env
+        uses: actions/github-script@v7
         with:
-          path: C:\vcpkg\installed
-          key: vcpkg-windows-x64-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-windows-x64-${{ runner.os }}-
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Cache vcpkg downloads
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\downloads
-          key: vcpkg-downloads-${{ runner.os }}
-          
       - name: Install Boost via vcpkg
+        env:
+          VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
           & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
