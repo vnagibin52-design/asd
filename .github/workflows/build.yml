@@ -18,16 +18,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Клонируем vcpkg один раз — он нужен и на Windows, и на Linux
-      - name: Clone vcpkg
+      # Клонируем vcpkg только если папки нет (универсально, но shell разный)
+      - name: Clone vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-            C:\vcpkg\bootstrap-vcpkg.bat
-          else
+          if not exist C:\vcpkg git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+        shell: cmd
+
+      - name: Clone vcpkg (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          if [ ! -d "$HOME/vcpkg" ]; then
             git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
-            $HOME/vcpkg/bootstrap-vcpkg.sh
           fi
+        shell: bash
+
+      # Запускаем bootstrap только на Windows (на Linux он уже запускается при клоне в скрипте .sh)
+      # На самом деле bootstrap-vcpkg.sh тоже можно запускать всегда — он безопасен при повторном запуске.
+      - name: Bootstrap vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
+        run: C:\vcpkg\bootstrap-vcpkg.bat
+        shell: cmd
+
+      - name: Bootstrap vcpkg (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: $HOME/vcpkg/bootstrap-vcpkg.sh
         shell: bash
 
       # Windows: настройка MSVC
@@ -46,7 +61,7 @@ jobs:
           restore-keys: |
             vcpkg-boost-${{ matrix.os }}-
 
-      # Установка Boost: Windows (PowerShell)
+      # Установка Boost: Windows
       - name: Install Boost via vcpkg (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -54,7 +69,7 @@ jobs:
           & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
         shell: pwsh
 
-      # Установка Boost: Linux (Bash)
+      # Установка Boost: Linux
       - name: Install Boost via vcpkg (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
