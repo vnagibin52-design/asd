@@ -7,16 +7,6 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
-permissions:
-  packages: write
-
-env:
-  USERNAME: vnagibin52-design  # ← замени на свой логин или название организации
-  VCPKG_EXE: C:\vcpkg\vcpkg.exe
-  FEED_URL: https://nuget.pkg.github.com/vnagibin52-design/index.json
-  VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/vnagibin52-design/index.json,readwrite"
-
-
 jobs:
   build:
     runs-on: windows-latest
@@ -28,22 +18,17 @@ jobs:
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Configure NuGet source for vcpkg binary cache
-        shell: pwsh
-        run: |
-          $nuget = & "C:\vcpkg\vcpkg.exe" fetch nuget | Select-Object -Last 1
-          & $nuget sources add `
-            -Source $env:FEED_URL `
-            -StorePasswordInClearText `
-            -Name GitHubPackages `
-            -UserName $env:USERNAME `
-            -Password ${{ secrets.GITHUB_TOKEN }}
-          & $nuget setapikey ${{ secrets.GITHUB_TOKEN }} `
-            -Source $env:FEED_URL
+      - name: Cache vcpkg binary archives and downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Users\runneradmin\AppData\Local\vcpkg\archives
+            C:\vcpkg\downloads
+          key: vcpkg-boost-x64-windows-${{ runner.os }}
+          restore-keys: |
+            vcpkg-boost-x64-windows-
 
       - name: Install Boost via vcpkg
-        env:
-          VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
           & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
@@ -60,7 +45,6 @@ jobs:
         run: cmake --build build --config Release
         shell: pwsh
 
-      # Копируем нужные DLL из vcpkg рядом с exe — чтобы артефакт работал сразу после распаковки
       - name: Copy Boost DLLs next to executables
         run: |
           $boostBin = "C:\vcpkg\installed\x64-windows\bin"
@@ -74,4 +58,3 @@ jobs:
           name: windows-build
           path: build/Release/
           retention-days: 7
-
