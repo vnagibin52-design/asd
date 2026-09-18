@@ -22,9 +22,11 @@ set_target_properties(helloworld_cli helloworld test_version PROPERTIES
 target_include_directories(helloworld
     PRIVATE "${CMAKE_BINARY_DIR}"
 )
-set_target_properties(test_version PROPERTIES
-    COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
-)
+if (MSVC)
+    set_target_properties(test_version PROPERTIES
+        COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
+    )
+endif()
 
 target_link_libraries(helloworld_cli PRIVATE
     helloworld
