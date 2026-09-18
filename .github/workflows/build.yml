@@ -18,6 +18,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Клонируем vcpkg один раз — он нужен и на Windows, и на Linux
+      - name: Clone vcpkg
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+            C:\vcpkg\bootstrap-vcpkg.bat
+          else
+            git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
+            $HOME/vcpkg/bootstrap-vcpkg.sh
+          fi
+        shell: bash
+
       # Windows: настройка MSVC
       - name: Setup MSVC environment (Windows only)
         if: matrix.os == 'windows-latest'
@@ -34,7 +46,7 @@ jobs:
           restore-keys: |
             vcpkg-boost-${{ matrix.os }}-
 
-      # Установка Boost: отдельный шаг для Windows (PowerShell)
+      # Установка Boost: Windows (PowerShell)
       - name: Install Boost via vcpkg (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -42,15 +54,15 @@ jobs:
           & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
         shell: pwsh
 
-      # Установка Boost: отдельный шаг для Linux (Bash)
+      # Установка Boost: Linux (Bash)
       - name: Install Boost via vcpkg (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           export VCPKG_ROOT="$HOME/vcpkg"
-          ./vcpkg/vcpkg install boost:x64-linux
+          "$HOME/vcpkg/vcpkg" install boost:x64-linux
         shell: bash
 
-      # Настройка CMake: отдельный шаг для Windows
+      # Настройка CMake: Windows
       - name: Configure with CMake (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -59,7 +71,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: pwsh
 
-      # Настройка CMake: отдельный шаг для Linux
+      # Настройка CMake: Linux
       - name: Configure with CMake (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -68,13 +80,13 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: bash
 
-      # Сборка: отдельный шаг для Windows
+      # Сборка: Windows
       - name: Build with CMake (Windows)
         if: matrix.os == 'windows-latest'
         run: cmake --build build --config Release
         shell: pwsh
 
-      # Сборка: отдельный шаг для Linux
+      # Сборка: Linux
       - name: Build with CMake (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: cmake --build build
