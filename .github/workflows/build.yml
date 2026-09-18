@@ -18,12 +18,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Для Windows: настройка MSVC. Для Linux: ничего не нужно (gcc/clang уже есть)
+      # Windows: настройка MSVC
       - name: Setup MSVC environment (Windows only)
         if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
 
-      # Кэш vcpkg: пути разные на Windows и Linux
+      # Кэш vcpkg: разные пути для разных ОС
       - name: Cache vcpkg binary archives and downloads
         uses: actions/cache@v4
         with:
@@ -34,43 +34,53 @@ jobs:
           restore-keys: |
             vcpkg-boost-${{ matrix.os }}-
 
-      # Установка vcpkg (если нет) и Boost. Триплет разный для платформ.
-      - name: Install Boost via vcpkg
+      # Установка Boost: отдельный шаг для Windows (PowerShell)
+      - name: Install Boost via vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            $env:VCPKG_ROOT = "C:\vcpkg"
-            & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
-          else
-            export VCPKG_ROOT="$HOME/vcpkg"
-            ./vcpkg/vcpkg install boost:x64-linux
-          fi
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          & "C:\vcpkg\vcpkg.exe" install boost:x64-windows
         shell: pwsh
 
-      # Настройка CMake. Пути и флаги отличаются.
-      - name: Configure with CMake
+      # Установка Boost: отдельный шаг для Linux (Bash)
+      - name: Install Boost via vcpkg (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            $env:VCPKG_ROOT = "C:\vcpkg"
-            cmake -B build `
-              -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          else
-            export VCPKG_ROOT="$HOME/vcpkg"
-            cmake -B build \
-              -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          fi
+          export VCPKG_ROOT="$HOME/vcpkg"
+          ./vcpkg/vcpkg install boost:x64-linux
+        shell: bash
+
+      # Настройка CMake: отдельный шаг для Windows
+      - name: Configure with CMake (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          cmake -B build `
+            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: pwsh
 
-      # Сборка. На Linux не нужна конфигурация Release/Debug отдельно — cmake --build всё сделает.
-      - name: Build with CMake
+      # Настройка CMake: отдельный шаг для Linux
+      - name: Configure with CMake (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake --build build --config Release
-          else
-            cmake --build build
-          fi
+          export VCPKG_ROOT="$HOME/vcpkg"
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        shell: bash
+
+      # Сборка: отдельный шаг для Windows
+      - name: Build with CMake (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cmake --build build --config Release
         shell: pwsh
 
-      # Копирование DLL только для Windows. На Linux shared-библиотеки обычно не копируют рядом с бинарником в CI.
+      # Сборка: отдельный шаг для Linux
+      - name: Build with CMake (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: cmake --build build
+        shell: bash
+
+      # Копирование DLL: только для Windows
       - name: Copy Boost DLLs next to executables (Windows only)
         if: matrix.os == 'windows-latest'
         run: |
