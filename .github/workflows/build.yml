@@ -7,6 +7,16 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  packages: write
+
+env:
+  USERNAME: vnagibin52-design  # ← замени на свой логин или название организации
+  VCPKG_EXE: C:\vcpkg\vcpkg.exe
+  FEED_URL: https://nuget.pkg.github.com/vnagibin52-design/index.json
+  VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/vnagibin52-design/index.json,readwrite"
+
+
 jobs:
   build:
     runs-on: windows-latest
@@ -18,13 +28,19 @@ jobs:
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
-       # Экспортируем переменные для бинарного кэша vcpkg
-      - name: Export GitHub Actions cache env
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Configure NuGet source for vcpkg binary cache
+        shell: pwsh
+        run: |
+          .$($env:VCPKG_EXE fetch nuget) `
+            sources add `
+            -Source $env:FEED_URL `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName $env:USERNAME `
+            -Password ${{ secrets.GITHUB_TOKEN }}
+          .$($env:VCPKG_EXE fetch nuget) `
+            setapikey ${{ secrets.GITHUB_TOKEN }} `
+            -Source $env:FEED_URL
 
       - name: Install Boost via vcpkg
         env:
