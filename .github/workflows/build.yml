@@ -1,5 +1,5 @@
 #Название Workflow
-name: CI    
+name: CI1
 
 # Запуск при:
 on:         
@@ -18,6 +18,8 @@ jobs:
     #С помощью matrix система автоматически создаст ещё одну
     #отдельную job. Одна для windows, другая для linux
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -26,6 +28,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      #Увеличиваем версию
+      - name: Bump patch version
+        id: bump
+        run: |
+          CURRENT=$(cat VERSION)
+          NEW=$((CURRENT + 1))
+          echo "$NEW" > VERSION
+          echo "new_version=$NEW" >> $GITHUB_OUTPUT
+        shell: bash
 
       #Клонирую vcpkg для последующей сборки Boost
       - name: Clone vcpkg (Windows)
@@ -101,16 +113,14 @@ jobs:
         #-DCMAKE_TOOLCHAIN_FILE подключает файл toolchain от vcpkg. Этот файл заставляет CMake искать зависимости через vcpkg, а не системные пакеты.
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
-          cmake -B build ` 
-            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: pwsh
 
       - name: Configure with CMake (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           export VCPKG_ROOT="$HOME/vcpkg"
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: bash
 
       #Сборка
@@ -157,3 +167,13 @@ jobs:
           name: ${{ matrix.os }}-release
           path: ${{ matrix.os == 'windows-latest' && 'C:\\release' || './release' }}
           retention-days: 7
+      
+      #Коммит новой версии в репозиторий
+      - name: Commit new version
+        if: success() && matrix.os == 'ubuntu-latest'
+        run: |
+          git config --global user.email "ci@github.com"
+          git config --global user.name "CI Bot"
+          git add VERSION
+          git commit -m "Bump patch version to ${{ steps.bump.outputs.new_version }}"
+          git push
