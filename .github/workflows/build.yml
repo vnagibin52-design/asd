@@ -29,6 +29,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Проверка на существование файла VERSION
+      - name: Check VERSION file exists
+        run: |
+          if [ -f VERSION ]; then
+            echo "Файл VERSION существует"
+          else
+            echo "Ошибка: Файл VERSION не найден"
+            exit 1
+          fi
+        shell: bash
+        
       #Увеличиваем версию
       - name: Bump patch version
         id: bump
