@@ -161,12 +161,27 @@ jobs:
           cmake --install build --config Release --prefix C:\release
         shell: pwsh
 
+# --- Упаковка артефактов в архив ---
+      - name: Archive artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd release
+          tar -czf ../helloworld-linux-v0.0.${{ steps.bump.outputs.new_version }}.tar.gz *
+          cd ..
+        shell: bash
+
+      - name: Archive artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Compress-Archive -Path C:\release\* -DestinationPath helloworld-windows-v0.0.${{ steps.bump.outputs.new_version }}.zip
+        shell: pwsh
+
       #Загрузка артефактов на GitHub
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-release
-          path: ${{ matrix.os == 'windows-latest' && 'C:\\release' || './release' }}
+          path: ${{ matrix.os == 'windows-latest' && 'helloworld-windows-*.zip' || 'helloworld-linux-*.tar.gz' }}
           retention-days: 7
       
       # --- КОММИТ НОВОЙ ВЕРСИИ (ТОЛЬКО НА LINUX И ТОЛЬКО В main) ---
@@ -187,3 +202,47 @@ jobs:
             git push
             echo "Version bumped and committed successfully."
           fi
+
+  #  RELEASE JOB — запускается только после успешной сборки
+  #  на обеих платформах
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Читаем текущую версию
+      - name: Read version
+        id: version
+        run: |
+          PATCH=$(cat VERSION)
+          NEW_PATCH=$((PATCH + 1))
+          echo "release_version=0.0.${NEW_PATCH}" >> $GITHUB_OUTPUT
+          echo "release_tag=v0.0.${NEW_PATCH}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      # Скачиваем артефакты сборки
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # Создаём GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.release_tag }}
+          name: Release ${{ steps.version.outputs.release_version }}
+          body: |
+            ## helloworld ${{ steps.version.outputs.release_version }}
+            - **Windows**: скачайте `helloworld-windows-*.zip`, распакуйте и запустите `helloworld_cli.exe`
+            - **Linux**: скачайте `helloworld-linux-*.tar.gz`, распакуйте и запустите `./helloworld_cli`
+          files: |
+            artifacts/ubuntu-latest/*
+            artifacts/windows-latest/*
+          generate_release_notes: true
