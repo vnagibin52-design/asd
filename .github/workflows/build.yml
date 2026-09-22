@@ -216,33 +216,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Читаем текущую версию
-      - name: Read version
-        id: version
+      # --- Читаем версию и формируем имена файлов ---
+      - name: Prepare release metadata
+        id: meta
         run: |
           PATCH=$(cat VERSION)
-          NEW_PATCH=$((PATCH + 1))
-          echo "release_version=0.0.${NEW_PATCH}" >> $GITHUB_OUTPUT
-          echo "release_tag=v0.0.${NEW_PATCH}" >> $GITHUB_OUTPUT
+          echo "release_version=0.0.${PATCH}" >> $GITHUB_OUTPUT
+          echo "release_tag=v0.0.${PATCH}" >> $GITHUB_OUTPUT
+          
+          echo "linux_file=helloworld-linux-v0.0.${PATCH}.tar.gz" >> $GITHUB_OUTPUT
+          echo "windows_file=helloworld-windows-v0.0.${PATCH}}.zip" >> $GITHUB_OUTPUT
         shell: bash
 
-      # Скачиваем артефакты сборки
-      - name: Download all artifacts
+      # --- Скачиваем артефакты ---
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      # Создаём GitHub Release
+      # --- ВАЖНО: Перемещаем файлы из подпапок в корень, чтобы пути были простыми ---
+      - name: Flatten artifact structure
+        run: |
+          mv artifacts/ubuntu-latest/* artifacts/ || true
+          mv artifacts/windows-latest/* artifacts/ || true
+        shell: bash
+
+      # --- Создаём GitHub Release ---
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.release_tag }}
-          name: Release ${{ steps.version.outputs.release_version }}
+          tag_name: ${{ steps.meta.outputs.release_tag }}
+          name: Release ${{ steps.meta.outputs.release_version }}
           body: |
-            ## helloworld ${{ steps.version.outputs.release_version }}
+            ## helloworld ${{ steps.meta.outputs.release_version }}
+
             - **Windows**: скачайте `helloworld-windows-*.zip`, распакуйте и запустите `helloworld_cli.exe`
             - **Linux**: скачайте `helloworld-linux-*.tar.gz`, распакуйте и запустите `./helloworld_cli`
           files: |
-            artifacts/ubuntu-latest/*
-            artifacts/windows-latest/*
+            artifacts/${{ steps.meta.outputs.linux_file }}
+            artifacts/${{ steps.meta.outputs.windows_file }}
+          allowUpdates: true
           generate_release_notes: true
