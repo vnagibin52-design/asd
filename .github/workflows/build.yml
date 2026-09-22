@@ -39,15 +39,14 @@ jobs:
             exit 1
           fi
         shell: bash
-        
-      #Увеличиваем версию
-      - name: Bump patch version
-        id: bump
+
+      # Увеличиваем версию
+      - name: Bump patch version (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           CURRENT=$(cat VERSION)
           NEW=$((CURRENT + 1))
           echo "$NEW" > VERSION
-          echo "new_version=$NEW" >> $GITHUB_OUTPUT
         shell: bash
 
       #Клонирую vcpkg для последующей сборки Boost
