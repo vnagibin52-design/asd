@@ -29,30 +29,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Создаём VERSION файл (если его нет) 
-      - name: Create VERSION file
-        if: file.exists(VERSION) == false
+       # --- ШАГ 1: Гарантированное наличие VERSION ---
+      # Мы не пытаемся проверить условие в if, мы делаем это внутри скрипта.
+      # Если файла нет - создаем с "1". Если есть - оставляем как есть.
+      - name: Ensure VERSION file exists
         run: |
-          echo "0.0.1" > VERSION
-
-      # Проверка на существование файла VERSION
-      - name: Check VERSION file exists
-        run: |
-          if [ -f VERSION ]; then
-            echo "Файл VERSION существует"
+          if [ ! -f VERSION ]; then
+            echo "1" > VERSION
+            echo "Created VERSION file with initial value 1"
           else
-            echo "Ошибка: Файл VERSION не найден"
-            exit 1
+            echo "VERSION file already exists."
           fi
+          cat VERSION
         shell: bash
 
-      # Увеличиваем версию
-      - name: Bump patch version (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      # --- ШАГ 2: Увеличиваем версию (ТОЛЬКО ПЕРЕД СБОРКОЙ) ---
+      - name: Bump patch version
+        id: bump
         run: |
           CURRENT=$(cat VERSION)
+          # Простая защита от мусора в файле
+          if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
+            echo "Error: VERSION file does not contain a valid number."
+            exit 1
+          fi
           NEW=$((CURRENT + 1))
           echo "$NEW" > VERSION
+          echo "New version is $NEW"
+          echo "new_version=$NEW" >> $GITHUB_OUTPUT
         shell: bash
 
       #Клонирую vcpkg для последующей сборки Boost
@@ -184,12 +188,21 @@ jobs:
           path: ${{ matrix.os == 'windows-latest' && 'C:\\release' || './release' }}
           retention-days: 7
       
-      #Коммит новой версии в репозиторий
-      - name: Commit new version
-        if: success() && matrix.os == 'ubuntu-latest'
+      # --- КОММИТ НОВОЙ ВЕРСИИ (ТОЛЬКО НА LINUX И ТОЛЬКО В main) ---
+      - name: Commit new version to repo
+        if: success() && matrix.os == 'ubuntu-latest' && github.ref == 'refs/heads/main'
         run: |
           git config --global user.email "ci@github.com"
           git config --global user.name "CI Bot"
+          
+          # Добавляем только файл VERSION, чтобы не закоммитить лишнее
           git add VERSION
-          git commit -m "Bump patch version to ${{ steps.bump.outputs.new_version }}"
-          git push
+          
+          # Проверяем, есть ли изменения
+          if git diff --cached --quiet; then
+            echo "No changes to commit (VERSION file unchanged)."
+          else
+            git commit -m "Bump patch version to ${{ steps.bump.outputs.new_version }}"
+            git push
+            echo "Version bumped and committed successfully."
+          fi
