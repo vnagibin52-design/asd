@@ -29,30 +29,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-       # --- ШАГ 1: Гарантированное наличие VERSION ---
-      # Мы не пытаемся проверить условие в if, мы делаем это внутри скрипта.
-      # Если файла нет - создаем с "1". Если есть - оставляем как есть.
-      - name: Ensure VERSION file exists
-        run: |
-          if [ ! -f VERSION ]; then
-            echo "1" > VERSION
-            echo "Created VERSION file with initial value 1"
-          else
-            echo "VERSION file already exists."
-          fi
-          cat VERSION
-        shell: bash
-
-      # --- ШАГ 2: Увеличиваем версию (ТОЛЬКО ПЕРЕД СБОРКОЙ) ---
+      #Увеличиваю версию
       - name: Bump patch version
         id: bump
         run: |
           CURRENT=$(cat VERSION)
-          # Простая защита от мусора в файле
-          if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
-            echo "Error: VERSION file does not contain a valid number."
-            exit 1
-          fi
           NEW=$((CURRENT + 1))
           echo "$NEW" > VERSION
           echo "New version is $NEW"
