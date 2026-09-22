@@ -1,32 +1,43 @@
-name: CI
+#Название Workflow
+name: CI    
 
-on:
+# Запуск при:
+on:         
+  #push в ветку main
   push:
-    branches: [ "main" ]
+    branches: [ "main" ]  
+  #pull request в ветку main
   pull_request:
     branches: [ "main" ]
+  #При ручном запуске в GitHub
   workflow_dispatch:
 
+#Выполняется одна job build
 jobs:
   build:
+    #С помощью matrix система автоматически создаст ещё одну
+    #отдельную job. Одна для windows, другая для linux
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
 
+    #Клонирую репозиторий в runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Clone vcpkg
+      #Клонирую vcpkg для последующей сборки Boost
       - name: Clone vcpkg (Windows)
         if: matrix.os == 'windows-latest'
-        run: |
+        #Проверка на существование папки, если нет клонирую
+        run: | 
           if not exist C:\vcpkg git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
         shell: cmd
 
       - name: Clone vcpkg (Linux)
         if: matrix.os == 'ubuntu-latest'
+        #Проверка на существование папки, если нет клонирую
         run: |
           if [ ! -d "$HOME/vcpkg" ]; then
             git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
@@ -44,12 +55,12 @@ jobs:
         run: $HOME/vcpkg/bootstrap-vcpkg.sh
         shell: bash
 
-      # Windows: MSVC
+      # Подключаю лкружение компилятора Microsoft Visual C++
       - name: Setup MSVC environment (Windows only)
         if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
 
-      # Cache vcpkg
+      #Кэширование vcpkg
       - name: Cache vcpkg binary archives and downloads
         uses: actions/cache@v4
         with:
@@ -68,7 +79,7 @@ jobs:
           sudo apt-get install -y autoconf autoconf-archive automake libtool
         shell: bash
 
-      # Install Boost
+      #Устанавливаю библиотеку Boost через vcpkg
       - name: Install Boost via vcpkg (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -83,12 +94,14 @@ jobs:
           "$HOME/vcpkg/vcpkg" install boost:x64-linux
         shell: bash
 
-      # Configure
+      #Запуск конфигурации CMake
       - name: Configure with CMake (Windows)
         if: matrix.os == 'windows-latest'
+        #Указываю через cmake -B директорию для сборки
+        #-DCMAKE_TOOLCHAIN_FILE подключает файл toolchain от vcpkg. Этот файл заставляет CMake искать зависимости через vcpkg, а не системные пакеты.
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
-          cmake -B build `
+          cmake -B build ` 
             -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: pwsh
 
@@ -100,7 +113,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake"
         shell: bash
 
-      # Build
+      #Сборка
       - name: Build with CMake (Windows)
         if: matrix.os == 'windows-latest'
         run: cmake --build build --config Release
@@ -111,7 +124,7 @@ jobs:
         run: cmake --build build
         shell: bash
 
-      # Copy Boost DLLs next to executables (Windows only) — чтобы в релизе сразу всё работало
+      #Копирование DLL Boost
       - name: Copy Boost DLLs (Windows only)
         if: matrix.os == 'windows-latest'
         run: |
@@ -120,7 +133,7 @@ jobs:
           Copy-Item "$boostBin\boost_unit_test_framework*.dll" -Destination $buildDir -Force
         shell: pwsh
 
-      # Create release artifacts via cmake --install
+      #Создание релизных артефактов (перекладываем результаты сборки в чистую папку)
       - name: Create release artifacts (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -137,7 +150,7 @@ jobs:
           cmake --install build --config Release --prefix C:\release
         shell: pwsh
 
-      # Upload clean release artifacts (только bin и lib, без CMake-кэшей)
+      #Загрузка артефактов на GitHub
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:

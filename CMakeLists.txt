@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(PATCH_VERSION "1" CACHE INTERNAL "Patch version")
-set(PROJECT_VESRION 0.0.${PATCH_VERSION})
+# Читаем номер патча из файла VERSION
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" PATCH_VERSION)
+string(STRIP "${PATCH_VERSION}" PATCH_VERSION)
+
+set(PROJECT_VERSION 0.0.${PATCH_VERSION})
 
 cmake_policy(SET CMP0167 NEW)
 
-project(helloworld VERSION ${PROJECT_VESRION})
+project(helloworld VERSION ${PROJECT_VERSION})
+
 
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
