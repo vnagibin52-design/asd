@@ -1,5 +1,5 @@
 #Название Workflow
-name: CI1
+name: CI
 
 # Запуск при:
 on:         
@@ -23,6 +23,8 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
 
     #Клонирую репозиторий в runner
     steps:
@@ -216,16 +218,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- Читаем версию и формируем имена файлов ---
+      # --- Берём версию напрямую из build job ---
       - name: Prepare release metadata
         id: meta
         run: |
-          PATCH=$(cat VERSION)
+          PATCH="${{ needs.build.outputs.new_version }}"
           echo "release_version=0.0.${PATCH}" >> $GITHUB_OUTPUT
           echo "release_tag=v0.0.${PATCH}" >> $GITHUB_OUTPUT
-          
           echo "linux_file=helloworld-linux-v0.0.${PATCH}.tar.gz" >> $GITHUB_OUTPUT
-          echo "windows_file=helloworld-windows-v0.0.${PATCH}}.zip" >> $GITHUB_OUTPUT
+          echo "windows_file=helloworld-windows-v0.0.${PATCH}.zip" >> $GITHUB_OUTPUT
         shell: bash
 
       # --- Скачиваем артефакты ---
@@ -234,22 +235,26 @@ jobs:
         with:
           path: artifacts
 
-      # --- ВАЖНО: Перемещаем файлы из подпапок в корень, чтобы пути были простыми ---
+      # --- Вытаскиваем файлы из подпапок ---
       - name: Flatten artifact structure
         run: |
-          mv artifacts/ubuntu-latest/* artifacts/ || true
-          mv artifacts/windows-latest/* artifacts/ || true
+          mv artifacts/ubuntu-latest/* artifacts/ 2>/dev/null || true
+          mv artifacts/windows-latest/* artifacts/ 2>/dev/null || true
+          echo "=== Files in artifacts/ ==="
+          ls -la artifacts/
         shell: bash
 
-      # --- Создаём GitHub Release ---
+      # --- Создаём релиз ---
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.release_tag }}
           name: Release ${{ steps.meta.outputs.release_version }}
+          draft: false
           body: |
             ## helloworld ${{ steps.meta.outputs.release_version }}
 
+            ### Установка
             - **Windows**: скачайте `helloworld-windows-*.zip`, распакуйте и запустите `helloworld_cli.exe`
             - **Linux**: скачайте `helloworld-linux-*.tar.gz`, распакуйте и запустите `./helloworld_cli`
           files: |
