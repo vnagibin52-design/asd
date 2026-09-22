@@ -1,5 +1,5 @@
 #Название Workflow
-name: CI
+name: CI1
 
 # Запуск при:
 on:         
