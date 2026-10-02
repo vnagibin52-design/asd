@@ -225,10 +225,10 @@ jobs:
             echo "ERROR: new_version is empty!" >&2
             exit 1
           fi
-          echo "release_version=0.0.${PATCH}" >> $GITHUB_OUTPUT
-          echo "release_tag=v0.0.${PATCH}" >> $GITHUB_OUTPUT
-          echo "linux_file=helloworld-linux-v0.0.${PATCH}.tar.gz" >> $GITHUB_OUTPUT
-          echo "windows_file=helloworld-windows-v0.0.${PATCH}.zip" >> $GITHUB_OUTPUT
+          echo "release_version=1.0.${PATCH}" >> $GITHUB_OUTPUT
+          echo "release_tag=v1.0.${PATCH}" >> $GITHUB_OUTPUT
+          echo "linux_file=helloworld-linux-v1.0.${PATCH}.tar.gz" >> $GITHUB_OUTPUT
+          echo "windows_file=helloworld-windows-v1.0.${PATCH}.zip" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Download Linux artifact
