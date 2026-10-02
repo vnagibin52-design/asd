@@ -207,58 +207,65 @@ jobs:
 
   #  RELEASE JOB — запускается только после успешной сборки
   #  на обеих платформах
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
+ release:
+  needs: build
+  runs-on: ubuntu-latest
+  if: github.ref == 'refs/heads/main'
+  permissions:
+    contents: write
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      # --- Берём версию напрямую из build job ---
-      - name: Prepare release metadata
-        id: meta
-        run: |
-          PATCH="${{ needs.build.outputs.new_version }}"
-          echo "release_version=0.0.${PATCH}" >> $GITHUB_OUTPUT
-          echo "release_tag=v0.0.${PATCH}" >> $GITHUB_OUTPUT
-          echo "linux_file=helloworld-linux-v0.0.${PATCH}.tar.gz" >> $GITHUB_OUTPUT
-          echo "windows_file=helloworld-windows-v0.0.${PATCH}.zip" >> $GITHUB_OUTPUT
-        shell: bash
+    - name: Prepare release metadata
+      id: meta
+      run: |
+        PATCH="${{ needs.build.outputs.new_version }}"
+        if [ -z "$PATCH" ]; then
+          echo "ERROR: new_version is empty!" >&2
+          exit 1
+        fi
+        echo "release_version=0.0.${PATCH}" >> $GITHUB_OUTPUT
+        echo "release_tag=v0.0.${PATCH}" >> $GITHUB_OUTPUT
+        echo "linux_file=helloworld-linux-v0.0.${PATCH}.tar.gz" >> $GITHUB_OUTPUT
+        echo "windows_file=helloworld-windows-v0.0.${PATCH}.zip" >> $GITHUB_OUTPUT
+      shell: bash
 
-      # --- Скачиваем артефакты ---
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/linux
+        name: ubuntu-latest-release
 
-      # --- Вытаскиваем файлы из подпапок ---
-      - name: Flatten artifact structure
-        run: |
-          mv artifacts/ubuntu-latest/* artifacts/ 2>/dev/null || true
-          mv artifacts/windows-latest/* artifacts/ 2>/dev/null || true
-          echo "=== Files in artifacts/ ==="
-          ls -la artifacts/
-        shell: bash
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/windows
+        name: windows-latest-release
 
-      # --- Создаём релиз ---
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.release_tag }}
-          name: Release ${{ steps.meta.outputs.release_version }}
-          draft: false
-          body: |
-            ## helloworld ${{ steps.meta.outputs.release_version }}
+    - name: Move to flat folder
+      run: |
+        mkdir -p artifacts/flat
+        mv artifacts/linux/* artifacts/flat/ 2>/dev/null || true
+        mv artifacts/windows/* artifacts/flat/ 2>/dev/null || true
+        ls -la artifacts/flat/
+      shell: bash
 
-            ### Установка
-            - **Windows**: скачайте `helloworld-windows-*.zip`, распакуйте и запустите `helloworld_cli.exe`
-            - **Linux**: скачайте `helloworld-linux-*.tar.gz`, распакуйте и запустите `./helloworld_cli`
-          files: |
-            artifacts/${{ steps.meta.outputs.linux_file }}
-            artifacts/${{ steps.meta.outputs.windows_file }}
-          allowUpdates: true
-          generate_release_notes: true
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.meta.outputs.release_tag }}
+        name: Release ${{ steps.meta.outputs.release_version }}
+        draft: false
+        body: |
+          ## helloworld ${{ steps.meta.outputs.release_version }}
+
+          ### Установка
+          - **Windows**: скачайте `helloworld-windows-*.zip`, распакуйте и запустите `helloworld_cli.exe`
+          - **Linux**: скачайте `helloworld-linux-*.tar.gz`, распакуйте и запустите `./helloworld_cli`
+        files: |
+          artifacts/flat/${{ steps.meta.outputs.linux_file }}
+          artifacts/flat/${{ steps.meta.outputs.windows_file }}
+        allowUpdates: true
+        generate_release_notes: true
